@@ -30,10 +30,6 @@ void broadcastMessage(const string &message, SOCKET sender_socket)
         {                                                            // 确保消息不发送回发送者
             send(client_socket, message.c_str(), message.size(), 0); // 向客户端发送消息
         }
-        else{
-            const char *newline = "\n";
-            send(client_socket, newline, strlen(newline), 0);
-        }
     }
 }
 
@@ -46,26 +42,29 @@ void handleClient(SOCKET client_socket)
     char buffer[BUFFER_SIZE]; // 用于存储从客户端接收的数据
     while (true)
     {
+        auto currentTime = std::chrono::system_clock::now();
+        time_t timestamp = std::chrono::system_clock::to_time_t(currentTime);
+        tm localTime;
+        localtime_s(&localTime, &timestamp);
+        char timeStr[50];
+
         memset(buffer, 0, BUFFER_SIZE);                                   // 将缓冲区清零，以准备接收新消息
         int bytes_received = recv(client_socket, buffer, BUFFER_SIZE, 0); // 接收来自客户端的数据
         if (bytes_received <= 0)
         { // 如果接收失败或客户端断开连接
-            cout << "Client disconnected, socket: " << client_socket << endl;
+            string message = std::string("(") + timeStr + ")" + "\n" + "Server: Client" + std::to_string(client_socket) + " is disconnected.\n";
+            cout << message;
+            broadcastMessage(message, client_socket);
             closesocket(client_socket);                                                          // 关闭与该客户端的连接
             lock_guard<mutex> lock(client_mutex);                                                // 锁住互斥锁，以安全地操作客户端列表
             clients.erase(remove(clients.begin(), clients.end(), client_socket), clients.end()); // 从列表中移除断开的客户端
             break;                                                                               // 结束当前客户端处理线程
         }
 
-        auto currentTime = std::chrono::system_clock::now();
-        time_t timestamp = std::chrono::system_clock::to_time_t(currentTime);
-        tm localTime;
-        localtime_s(&localTime, &timestamp);
-        char timeStr[50];
         strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &localTime); // 格式化时间输出
 
-        std::string message = "Client " + std::to_string(client_socket) + " " + timeStr + "\n" + buffer + "\n\n";
-        std::cout << message;
+        string message = std::string("(") + timeStr + ")" + "\n" + "Client" + std::to_string(client_socket) + ": " + buffer + "\n";
+        cout << message;
         broadcastMessage(message, client_socket); // 广播消息给其他客户端
     }
 }
@@ -113,10 +112,10 @@ int main()
         return -1;
     }
 
-    cout << "Server started on port " << PORT << "..." << endl <<endl;
+    cout << "Server started on port " << PORT << "..." << endl;
 
     // 主循环：接受客户端连接并启动新的线程来处理每个客户端
-    while (true)
+    while (1)
     {
         SOCKET client_socket = accept(server_socket, nullptr, nullptr); // 接受一个新的客户端连接
         if (client_socket == INVALID_SOCKET)
@@ -134,13 +133,13 @@ int main()
         char timeStr[50];
         strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &localTime); // 格式化时间输出
 
-        cout << "Server     " << timeStr << endl;
-        cout << "client" << client_socket << " is connected." << endl
-             << endl;
+        string message = std::string("(") + timeStr + ")" + "\n" + "Server: Client" + std::to_string(client_socket) + " is connected.\n";
+        cout << message;
+        broadcastMessage(message, client_socket);
         thread(handleClient, client_socket).detach(); // 为新客户端启动一个线程，并与主线程分离
     }
-
     closesocket(server_socket); // 关闭服务器套接字
     WSACleanup();               // 清理Winsock资源
+    cout << "Exited." << endl;
     return 0;
 }
