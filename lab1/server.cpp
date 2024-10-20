@@ -42,14 +42,14 @@ void handleClient(SOCKET client_socket)
     char buffer[BUFFER_SIZE]; // 用于存储从客户端接收的数据
     while (true)
     {
+        memset(buffer, 0, BUFFER_SIZE);                                   // 将缓冲区清零，以准备接收新消息
+        int bytes_received = recv(client_socket, buffer, BUFFER_SIZE, 0); // 接收来自客户端的数据
         auto currentTime = std::chrono::system_clock::now();
         time_t timestamp = std::chrono::system_clock::to_time_t(currentTime);
         tm localTime;
         localtime_s(&localTime, &timestamp);
         char timeStr[50];
-
-        memset(buffer, 0, BUFFER_SIZE);                                   // 将缓冲区清零，以准备接收新消息
-        int bytes_received = recv(client_socket, buffer, BUFFER_SIZE, 0); // 接收来自客户端的数据
+        strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &localTime); // 格式化时间输出
         if (bytes_received <= 0)
         { // 如果接收失败或客户端断开连接
             string message = std::string("(") + timeStr + ")" + "\n" + "Server: Client" + std::to_string(client_socket) + " is disconnected.\n";
@@ -60,8 +60,6 @@ void handleClient(SOCKET client_socket)
             clients.erase(remove(clients.begin(), clients.end(), client_socket), clients.end()); // 从列表中移除断开的客户端
             break;                                                                               // 结束当前客户端处理线程
         }
-
-        strftime(timeStr, sizeof(timeStr), "%Y-%m-%d %H:%M:%S", &localTime); // 格式化时间输出
 
         string message = std::string("(") + timeStr + ")" + "\n" + "Client" + std::to_string(client_socket) + ": " + buffer + "\n";
         cout << message;
